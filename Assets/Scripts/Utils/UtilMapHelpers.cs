@@ -41,7 +41,8 @@ public class UtilMapHelpers
     public static Vector2 MatrixToBoardPosition(Vector2Int matrixPosition, Vector2 cellSize, int maxCol, int maxRow)
     {
         Vector2 boardPosition = Vector2.zero;
-
+        boardPosition.x = (matrixPosition.y - maxCol / 2) * cellSize.x;
+        boardPosition.y = (maxRow / 2 - matrixPosition.x) * cellSize.y;
         return boardPosition;
     }
 
