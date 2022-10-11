@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.EventSystems;
+
 
 public enum BallState
 {
@@ -10,8 +10,10 @@ public enum BallState
     Moving
 }
 
-public class BallController : MonoBehaviour, IPointerClickHandler
+public class BallController : MonoBehaviour
 {
+
+    public static event System.Action<BallController> OnPlayerClick= delegate { };
 
     private Animator ballAnimator;
    
@@ -47,7 +49,7 @@ public class BallController : MonoBehaviour, IPointerClickHandler
         InitValues();
     }
 
-    void InitValues()
+    public void InitValues()
     {
         ballState = BallState.Idle;
         ballSprite = GetComponent<SpriteRenderer>();
@@ -60,7 +62,9 @@ public class BallController : MonoBehaviour, IPointerClickHandler
 
     }
 
-    public void OnPointerClick(PointerEventData eventData)
+    
+
+    public void OnBallSelected()
     {
         if (BallState != BallState.Bouncing)
         {
@@ -70,5 +74,10 @@ public class BallController : MonoBehaviour, IPointerClickHandler
         {
             BallState = BallState.Idle;
         }
+    }
+
+    public void SetData(Color color)
+    {
+        ballSprite.color = color;
     }
 }

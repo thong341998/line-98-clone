@@ -11,9 +11,8 @@ GameObject:
   - component: {fileID: 5814691351998887695}
   - component: {fileID: 5814691351998887694}
   - component: {fileID: 5814691351998887692}
-  - component: {fileID: 5814691351998887693}
   - component: {fileID: 5814691351998887690}
-  m_Layer: 6
+  m_Layer: 0
   m_Name: Ball
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -97,23 +96,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7dee6a88fac0d1d44adfbd797ea6a11e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ballColor: {r: 1, g: 0, b: 0, a: 1}
---- !u!58 &5814691351998887693
-CircleCollider2D:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5814691351998887729}
-  m_Enabled: 1
-  m_Density: 1
-  m_Material: {fileID: 0}
-  m_IsTrigger: 1
-  m_UsedByEffector: 0
-  m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
-  serializedVersion: 2
-  m_Radius: 0.5
 --- !u!95 &5814691351998887690
 Animator:
   serializedVersion: 3
@@ -127,7 +109,7 @@ Animator:
   m_Controller: {fileID: 9100000, guid: a4073bbd6b18e304d89496d7fdc42d30, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
-  m_ApplyRootMotion: 0
+  m_ApplyRootMotion: 1
   m_LinearVelocityBlending: 0
   m_WarningMessage: 
   m_HasTransformHierarchy: 1

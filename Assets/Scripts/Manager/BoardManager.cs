@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using CommonConstants;
+using System;
+using Random = UnityEngine.Random;
 
 struct Cell
 {
@@ -37,23 +39,28 @@ struct PPair
 
 public class BoardManager : MonoBehaviour, IPointerClickHandler
 {
-    [SerializeField] private GameObject ballPrefs;
-    [SerializeField] private int ballCount;
     public static BoardManager Instance = null;
 
-    private Dictionary<Vector2, BallController> ballDictionary = new Dictionary<Vector2, BallController>(); // Use to store ball with its board position
+    [Header("Configuration")]
+    [Header("Ball Generation")]
+    [SerializeField] private GameObject ballPrefabs;
+    [SerializeField] private Color[] colorArray;
+    [SerializeField] private int ballCount;
 
-    
-    
+    [Header("Debugging")]
+    [SerializeField] private bool drawPath;
 
-    public void OnPointerClick(PointerEventData eventData)
-    {
-        Vector2 worldPos = MapProvider.Instance.gameCam.ScreenToWorldPoint(eventData.position);
+    private BallController currentSelectedBall = null;
+    private Dictionary<Vector2Int, BallController> ballDictionary = new Dictionary<Vector2Int, BallController>(); // Use to store ball with its matrix position
+    private Stack<Vector2Int> ballPath = new Stack<Vector2Int>();
 
-        //Snap to board position
-        Vector2 boardPosition = UtilMapHelpers.WorldToBoardPosition(worldPos, MapProvider.Instance.cellSize, MapConstants.BOARD_COL, MapConstants.BOARD_ROW);
+    #region Cache Value
+    private int boardRow;
+    private int boardCol;
+    private Vector2 cellSize;
+    private Queue<Vector2> boardPath = new Queue<Vector2>(); // The path generate from A* Pathfinding in board position
 
-    }
+    #endregion  
 
     private void Awake()
     {
@@ -63,20 +70,118 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
             DestroyImmediate(gameObject);
     }
 
+    
+
     // Start is called before the first frame update
     void Start()
     {
+        InitValues();
         GenerateBalls(ballCount);
+    }
+
+    void OnDrawGizmos()
+    {
+        Gizmos.color = Color.black;
+        if (drawPath)
+        {
+            foreach (var center in boardPath)
+            {
+                Gizmos.DrawSphere(new Vector3(center.x, center.y), 0.1f);
+            }
+         
+        }
+    }
+
+    private void InitValues()
+    {
+        boardRow = MapConstants.BOARD_ROW;
+        boardCol = MapConstants.BOARD_COL;
+        cellSize = MapProvider.Instance.cellSize;
+    }
+
+    Vector2 prevBoard;
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        Vector2 worldPos = MapProvider.Instance.gameCam.ScreenToWorldPoint(eventData.position);
+
+        //Snap to board position
+        Vector2 boardPosition = UtilMapHelpers.WorldToBoardPosition(worldPos, cellSize, boardCol, boardRow);
+
+        bool hasBallOnPos = HasBallOn(boardPosition);
+        Debug.Log(hasBallOnPos);
+        //Check if the board postion has the ball in it
+        if (hasBallOnPos)
+        {
+            //Assume we click on the ball
+            currentSelectedBall = ballDictionary[UtilMapHelpers.BoardToMatrixPosition(boardPosition,cellSize,boardCol,boardRow)];
+            //Click on the same position and has ball
+            Debug.Log(string.Format("({0},{1})",prevBoard.x,prevBoard.y));
+            Debug.Log(string.Format("({0},{1})",currentSelectedBall.transform.position.x,currentSelectedBall.transform.position.y));
+            if (prevBoard == (Vector2)currentSelectedBall.transform.position)
+            {
+                Debug.Log("Click on same ball!");
+                return;
+            }
+            currentSelectedBall.OnBallSelected();
+        }
+
+        //Else if click on empty cell and the current selected ball is not empty, then generate path and move ball on that path
+        else if (currentSelectedBall != null) 
+        {
+          
+
+            ballPath.Clear();
+            boardPath.Clear();
+
+           
+            var ballMatPos = UtilMapHelpers.BoardToMatrixPosition(currentSelectedBall.transform.position, cellSize, boardCol, boardRow);
+            //Debug.Log(ballMatPos);
+            var destMatPos = UtilMapHelpers.BoardToMatrixPosition(boardPosition, cellSize, boardCol, boardRow);
+            ballPath = AStarPathFinding(ballMatPos,destMatPos, boardRow, boardCol);
+
+            while (ballPath.Count != 0)
+            {
+                var waypoint = ballPath.Pop();
+                var boardPos = UtilMapHelpers.MatrixToBoardPosition(waypoint, cellSize, boardCol, boardRow);
+                boardPath.Enqueue(boardPos);
+                //Debug.Log(boardPosition);
+            }
+
+        }
+
+        prevBoard = boardPosition;
+    }
+
+    private void BallController_OnPlayerClick(BallController ballController)
+    {
+        if (currentSelectedBall != ballController)
+        {
+            currentSelectedBall = ballController;
+        }
     }
 
 
     private void GenerateBalls(int ballCount)
     {
-        var balls = GetComponentsInChildren<BallController>();
-        for (int i = 0; i < balls.Length; i++)
+        Color randColor = new Color();
+        int count = 0;
+        Vector2Int matPos = new Vector2Int();
+        while (count <= ballCount)
         {
-            ballDictionary.Add(balls[i].transform.position, balls[i]);
+           
+            matPos.Set(Random.Range(0, boardRow), Random.Range(0, boardCol));
+            if (!ballDictionary.ContainsKey(matPos))
+            {
+                randColor = colorArray[Random.Range(0, colorArray.Length)];
+                var boardPos = UtilMapHelpers.MatrixToBoardPosition(matPos, cellSize, boardCol, boardRow);
+                var ballPref = Instantiate(ballPrefabs, boardPos, Quaternion.identity, transform).GetComponent<BallController>();
+                ballPref.InitValues();
+                ballPref.SetData(randColor);
+                ballDictionary.Add(matPos, ballPref);
+                count++;
+            }
         }
+        
     }
 
     /// <summary>
@@ -92,7 +197,6 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
     private Stack<Vector2Int> AStarPathFinding(Vector2Int source, Vector2Int dest, int boardRow, int boardCol)
     {
         
-
         //Create a closed list
         bool[,] closeList = new bool[boardRow, boardCol];
 
@@ -160,7 +264,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                     break;
                 }
                 //If the successor is already in the closed list or if it is blocked, then ignore it.Else do the following
-                else if (closeList[currentSuccessor.x, currentSuccessor.y] == false && !IsBlocked(currentSuccessor))
+                else if (closeList[currentSuccessor.x, currentSuccessor.y] == false && !HasBallOn(currentSuccessor))
                 {
                     gNew = cellMatrix[currentSuccessor.x, currentSuccessor.y].g + 1.0f;
                     hNew = CalculateHeuristics(dest,currentSuccessor);
@@ -203,7 +307,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                     break;
                 }
                 //If the successor is already in the closed list or if it is blocked, then ignore it.Else do the following
-                else if (closeList[currentSuccessor.x, currentSuccessor.y] == false && !IsBlocked(currentSuccessor))
+                else if (closeList[currentSuccessor.x, currentSuccessor.y] == false && !HasBallOn(currentSuccessor))
                 {
                     gNew = cellMatrix[currentSuccessor.x, currentSuccessor.y].g + 1.0f;
                     hNew = CalculateHeuristics(dest, currentSuccessor);
@@ -246,7 +350,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                     break;
                 }
                 //If the successor is already in the closed list or if it is blocked, then ignore it.Else do the following
-                else if (closeList[currentSuccessor.x, currentSuccessor.y] == false && !IsBlocked(currentSuccessor))
+                else if (closeList[currentSuccessor.x, currentSuccessor.y] == false && !HasBallOn(currentSuccessor))
                 {
                     gNew = cellMatrix[currentSuccessor.x, currentSuccessor.y].g + 1.0f;
                     hNew = CalculateHeuristics(dest, currentSuccessor);
@@ -289,7 +393,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                     break;
                 }
                 //If the successor is already in the closed list or if it is blocked, then ignore it.Else do the following
-                else if (closeList[currentSuccessor.x, currentSuccessor.y] == false && !IsBlocked(currentSuccessor))
+                else if (closeList[currentSuccessor.x, currentSuccessor.y] == false && !HasBallOn(currentSuccessor))
                 {
                     gNew = cellMatrix[currentSuccessor.x, currentSuccessor.y].g + 1.0f;
                     hNew = CalculateHeuristics(dest, currentSuccessor);
@@ -342,9 +446,6 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
             col = tempC;
         }
 
-        path.Push(new Vector2Int(row, col));
-     
-        
         return path;
     }
 
@@ -365,10 +466,17 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         return (curSuccessor.x >= 0) && (curSuccessor.x < MapConstants.BOARD_COL) && (curSuccessor.y >= 0) && (curSuccessor.y < MapConstants.BOARD_ROW);
     }
 
-    private bool IsBlocked(Vector2Int matrixPosition)
+    
+
+    private bool HasBallOn(Vector2 boardPosition)
     {
-        var boardPosition = UtilMapHelpers.MatrixToBoardPosition(matrixPosition, MapProvider.Instance.cellSize, MapConstants.BOARD_COL, MapConstants.BOARD_ROW);
-        return ballDictionary.ContainsKey(boardPosition);//NOTICE: Test this function carefully
+        //foreach (var ball in ballDictionary)
+        //{
+        //    if (Vector2.SqrMagnitude(ball.Key - boardPosition) < float.Epsilon)
+        //        return true;
+        //}
+        //return false;
+        return ballDictionary.ContainsKey(UtilMapHelpers.BoardToMatrixPosition(boardPosition,cellSize,boardCol,boardRow));
     }
 
     #endregion
