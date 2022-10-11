@@ -14,9 +14,7 @@ public class BallController : MonoBehaviour, IPointerClickHandler
 {
 
     private Animator ballAnimator;
-    [SerializeField]
-    private Color ballColor;
-
+   
     private BallState ballState;
 
     public BallState BallState
@@ -53,7 +51,6 @@ public class BallController : MonoBehaviour, IPointerClickHandler
     {
         ballState = BallState.Idle;
         ballSprite = GetComponent<SpriteRenderer>();
-        ballSprite.color = ballColor;
         ballAnimator = GetComponent<Animator>();
     }
 

@@ -13,6 +13,7 @@ namespace CommonConstants
     {
         public static readonly int BOARD_COL = 9;
         public static readonly int BOARD_ROW = 9;
+        
     }
 
     public class StringConstants
