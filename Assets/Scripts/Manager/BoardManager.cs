@@ -39,6 +39,8 @@ struct PPair
 
 public class BoardManager : MonoBehaviour, IPointerClickHandler
 {
+    public static event Action<Queue<Vector2>> OnGeneratePathComplete = delegate { };
+
     public static BoardManager Instance = null;
 
     [Header("Configuration")]
@@ -88,7 +90,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
             {
                 Gizmos.DrawSphere(new Vector3(center.x, center.y), 0.1f);
             }
-         
+            //Gizmos.DrawSphere(prevBoard, 0.1f);
         }
     }
 
@@ -99,29 +101,37 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         cellSize = MapProvider.Instance.cellSize;
     }
 
-    Vector2 prevBoard;
+    Vector2Int prevBoard;
     public void OnPointerClick(PointerEventData eventData)
     {
+        //Debug.Log("On Click");
         Vector2 worldPos = MapProvider.Instance.gameCam.ScreenToWorldPoint(eventData.position);
 
         //Snap to board position
         Vector2 boardPosition = UtilMapHelpers.WorldToBoardPosition(worldPos, cellSize, boardCol, boardRow);
-
+        Vector2Int clickMatPos = UtilMapHelpers.BoardToMatrixPosition(boardPosition, cellSize, boardCol, boardRow);
         bool hasBallOnPos = HasBallOn(boardPosition);
-        Debug.Log(hasBallOnPos);
+        //Debug.Log(hasBallOnPos);
         //Check if the board postion has the ball in it
         if (hasBallOnPos)
         {
-            //Assume we click on the ball
+            //If click ball and click on another ball, then cancel previous ball, s
+            BallController prevBall = currentSelectedBall;
+
+            //Changed currentSelecedBall to the current ball
             currentSelectedBall = ballDictionary[UtilMapHelpers.BoardToMatrixPosition(boardPosition,cellSize,boardCol,boardRow)];
-            //Click on the same position and has ball
-            Debug.Log(string.Format("({0},{1})",prevBoard.x,prevBoard.y));
-            Debug.Log(string.Format("({0},{1})",currentSelectedBall.transform.position.x,currentSelectedBall.transform.position.y));
-            if (prevBoard == (Vector2)currentSelectedBall.transform.position)
+            Vector2Int selectedBallMatPos = UtilMapHelpers.BoardToMatrixPosition(
+                currentSelectedBall.transform.position, cellSize, boardCol, boardRow);
+
+            //Click on the same position and has ball            
+            if (prevBoard == selectedBallMatPos)
             {
                 Debug.Log("Click on same ball!");
                 return;
             }
+
+        
+            if (prevBall != null) prevBall.OnBallCancelSelected();
             currentSelectedBall.OnBallSelected();
         }
 
@@ -147,9 +157,25 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 //Debug.Log(boardPosition);
             }
 
+
+            //Set path for current ball to move itself and subcribe to even when ball move completed
+            currentSelectedBall.SetPath(boardPath);
+            currentSelectedBall.OnBallMoveCompleted += CurrentSelectedBall_OnBallMoveCompleted;
         }
 
-        prevBoard = boardPosition;
+        prevBoard = clickMatPos;
+
+        
+    }
+
+    private void CurrentSelectedBall_OnBallMoveCompleted()
+    {
+        //Update the position of the ball
+        
+
+        currentSelectedBall.OnBallMoveCompleted -= CurrentSelectedBall_OnBallMoveCompleted;
+        currentSelectedBall = null;
+       
     }
 
     private void BallController_OnPlayerClick(BallController ballController)
@@ -477,6 +503,11 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         //}
         //return false;
         return ballDictionary.ContainsKey(UtilMapHelpers.BoardToMatrixPosition(boardPosition,cellSize,boardCol,boardRow));
+    }
+
+    private bool HasBallOn(Vector2Int matPosition)
+    {
+        return ballDictionary.ContainsKey(matPosition);
     }
 
     #endregion

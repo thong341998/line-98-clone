@@ -12,13 +12,13 @@ public enum BallState
 
 public class BallController : MonoBehaviour
 {
+    public event System.Action OnBallMoveCompleted = delegate { };
 
-    public static event System.Action<BallController> OnPlayerClick= delegate { };
+    [SerializeField] private float moveTime = 0.5f;
+    [SerializeField] private float moveSpeed = 5f;
 
-    private Animator ballAnimator;
-   
+    
     private BallState ballState;
-
     public BallState BallState
     {
         get => ballState;
@@ -39,14 +39,50 @@ public class BallController : MonoBehaviour
         }
     }
 
+    //Components
     private SpriteRenderer ballSprite;
+    private Animator ballAnimator;
+    private Coroutine moveByUnitCR;
+
+    //Data sructure
+    private Queue<Vector2> path;
+    private Vector2 currentWaypoint;
+
+    //Data types
+    public bool pathCompleted = false;
+
+
     private readonly int IS_CLICK_PARAM = Animator.StringToHash("isClick");
+
+    
     
 
-    // Start is called before the first frame update
     void Start()
     {
         InitValues();
+    }
+
+    public void SetPath(Queue<Vector2> boardPath)
+    {
+        path = boardPath;
+        currentWaypoint = path.Dequeue();
+        pathCompleted = true;
+        BallState = BallState.Moving;// Ball is moving
+    }
+
+    public void OnBallSelected()
+    {
+        BallState = BallState.Bouncing;
+    }
+
+    public void OnBallCancelSelected()
+    {
+        BallState = BallState.Idle;
+    }
+
+    public void SetData(Color color)
+    {
+        ballSprite.color = color;
     }
 
     public void InitValues()
@@ -57,27 +93,62 @@ public class BallController : MonoBehaviour
     }
 
 
+    private void Update()
+    {
+        if (pathCompleted)
+        {
+           FollowPath();
+        }
+    }
+
     private void MoveByUnit(float distance)
     {
 
     }
 
-    
-
-    public void OnBallSelected()
+    private void FollowPath()
     {
-        if (BallState != BallState.Bouncing)
+        
+        //Move towards waypoint
+        //var waypoint = path.Dequeue();
+        transform.position = Vector2.MoveTowards(transform.position, currentWaypoint, Time.deltaTime * moveSpeed);
+
+        //Check if ball reach the current way point
+        float distSqr = Vector2.SqrMagnitude((Vector2)transform.position - currentWaypoint);
+        if (distSqr < float.Epsilon )
         {
-            BallState = BallState.Bouncing;
-        }
-        else
-        {
-            BallState = BallState.Idle;
+            //If this is the last waypoint then return
+            if (path.Count == 0)
+            {
+                //Ball move completed, Reset values for the next path;
+                BallState = BallState.Idle;
+                pathCompleted = false;
+                OnBallMoveCompleted?.Invoke();
+                return;
+            }
+               
+            //Move to next waypoint
+            currentWaypoint = path.Dequeue();
         }
     }
 
-    public void SetData(Color color)
+    
+   
+
+    IEnumerator CR_MoveByUnit(Vector2 src, Vector2 dest, System.Action completed = null)
     {
-        ballSprite.color = color;
+        float t = 0f;
+        float cur = 0f;
+        while (cur < moveTime)
+        {
+            cur += Time.deltaTime;
+            t = cur / moveTime;
+            Vector2 newPos = Vector2.Lerp(src, dest, t);
+            transform.position = newPos;
+            yield return null;
+        }
+
+        transform.position = dest;
+        completed?.Invoke();
     }
 }

@@ -325,7 +325,7 @@ MonoBehaviour:
   - {r: 1, g: 0.8518007, b: 0, a: 1}
   - {r: 0, g: 0.20553756, b: 1, a: 1}
   - {r: 0, g: 0.8113208, b: 0.12645455, a: 1}
-  ballCount: 4
+  ballCount: 15
   drawPath: 1
 --- !u!61 &960246237
 BoxCollider2D:
