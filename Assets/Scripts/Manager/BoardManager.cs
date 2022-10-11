@@ -171,7 +171,8 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
     private void CurrentSelectedBall_OnBallMoveCompleted()
     {
         //Update the position of the ball
-        
+        ballDictionary.Remove(prevBoard);
+        ballDictionary.Add(UtilMapHelpers.BoardToMatrixPosition(currentSelectedBall.transform.position, cellSize, boardCol, boardRow),currentSelectedBall);
 
         currentSelectedBall.OnBallMoveCompleted -= CurrentSelectedBall_OnBallMoveCompleted;
         currentSelectedBall = null;
