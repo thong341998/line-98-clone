@@ -43,11 +43,17 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
 
     public static BoardManager Instance = null;
 
+    [Header("References")]
+    [SerializeField] private BallDestroyer ballDestroyer;
+
     [Header("Configuration")]
     [Header("Ball Generation")]
     [SerializeField] private GameObject ballPrefabs;
     [SerializeField] private Color[] colorArray;
     [SerializeField] private int ballCount;
+
+    [Header("Bal Lines")]
+    [SerializeField] private int destroyAmmount = 3;//Number of ball created a line and can be destroy
 
     [Header("Debugging")]
     [SerializeField] private bool drawPath;
@@ -102,6 +108,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
     }
 
     Vector2Int prevBoard;
+    Vector2Int clickMatPos;
     public void OnPointerClick(PointerEventData eventData)
     {
         //Debug.Log("On Click");
@@ -109,7 +116,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
 
         //Snap to board position
         Vector2 boardPosition = UtilMapHelpers.WorldToBoardPosition(worldPos, cellSize, boardCol, boardRow);
-        Vector2Int clickMatPos = UtilMapHelpers.BoardToMatrixPosition(boardPosition, cellSize, boardCol, boardRow);
+        clickMatPos = UtilMapHelpers.BoardToMatrixPosition(boardPosition, cellSize, boardCol, boardRow);
         bool hasBallOnPos = HasBallOn(boardPosition);
         //Debug.Log(hasBallOnPos);
         //Check if the board postion has the ball in it
@@ -174,9 +181,13 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         ballDictionary.Remove(prevBoard);
         ballDictionary.Add(UtilMapHelpers.BoardToMatrixPosition(currentSelectedBall.transform.position, cellSize, boardCol, boardRow),currentSelectedBall);
 
+        //Find ball lines
+        DestroyBallLines();
+
+        //End turn,  change to the next ball by reseting values
         currentSelectedBall.OnBallMoveCompleted -= CurrentSelectedBall_OnBallMoveCompleted;
         currentSelectedBall = null;
-       
+        prevBoard = new Vector2Int(-1, -1);
     }
 
     private void BallController_OnPlayerClick(BallController ballController)
@@ -187,6 +198,190 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         }
     }
 
+    //Find the line including with balls
+    private void DestroyBallLines()
+    {
+        //Start at the current ball position
+        Color curBallColor = currentSelectedBall.BallColor;
+        Vector2Int curMatPos = clickMatPos;
+        Queue<BallController> ballLines = new Queue<BallController>();
+        ballLines.Enqueue(currentSelectedBall);
+        //----Vertical Check ------     
+        while (curMatPos.x >= 0  )
+        {
+            curMatPos.x--;
+            if (HasBallOn(curMatPos))
+            {
+                var ballEntry = ballDictionary[curMatPos];
+                if (ballEntry.BallColor == curBallColor)
+                {
+                    ballLines.Enqueue(ballEntry);
+                }
+                else break;
+            }
+            else break;
+        }
+        curMatPos.x = clickMatPos.x;
+        while (curMatPos.x < boardRow)
+        {
+            curMatPos.x++;
+            if (HasBallOn(curMatPos))
+            {
+                var ballEntry = ballDictionary[curMatPos];
+                if (ballEntry.BallColor == curBallColor)
+                {
+                    ballLines.Enqueue(ballEntry);
+                }
+                else break;
+            }
+            else break;
+        }
+
+        //Check if this lines longer than the player desire values
+        if (ballLines.Count >= destroyAmmount)
+        {
+            DestroyBallLines(ballLines);
+        }
+
+        //------Horizonal Check------
+        ballLines.Clear();
+        ballLines.Enqueue(currentSelectedBall);
+        curMatPos = clickMatPos;
+        while (curMatPos.y >=0)
+        {
+            curMatPos.y--;
+            if (HasBallOn(curMatPos))
+            {
+                var ballEntry = ballDictionary[curMatPos];
+                if (ballEntry.BallColor == curBallColor)
+                {
+                    ballLines.Enqueue(ballEntry);
+                }
+                else break;
+            }
+            else break;
+        }
+        curMatPos.y = clickMatPos.y;
+        while (curMatPos.y <boardCol)
+        {
+            curMatPos.y++;
+            if (HasBallOn(curMatPos))
+            {
+                var ballEntry = ballDictionary[curMatPos];
+                if (ballEntry.BallColor == curBallColor)
+                {
+                    ballLines.Enqueue(ballEntry);
+                }
+                else break;
+            }
+            else break;
+        }
+
+        //Check if this lines longer than the player desire values
+        if (ballLines.Count >= destroyAmmount)
+        {
+            DestroyBallLines(ballLines);
+        }
+
+        //----First Diagonal Check----
+        ballLines.Clear();
+        ballLines.Enqueue(currentSelectedBall);
+        curMatPos = clickMatPos;
+        while (curMatPos.x >= 0 && curMatPos.y >= 0)
+        {
+            curMatPos.x--;
+            curMatPos.y--;
+            if (HasBallOn(curMatPos))
+            {
+                var ballEntry = ballDictionary[curMatPos];
+                if (ballEntry.BallColor == curBallColor)
+                {
+                    ballLines.Enqueue(ballEntry);
+                }
+                else break;
+            }
+            else break;
+        }
+
+        curMatPos = clickMatPos;
+        while (curMatPos.x < boardRow && curMatPos.y < boardCol)
+        {
+            curMatPos.x++;
+            curMatPos.y++;
+            if (HasBallOn(curMatPos))
+            {
+                var ballEntry = ballDictionary[curMatPos];
+                if (ballEntry.BallColor == curBallColor)
+                {
+                    ballLines.Enqueue(ballEntry);
+                }
+                else break;
+            }
+            else break;
+        }
+
+
+        //Check if this lines longer than the player desire values
+        if (ballLines.Count >= destroyAmmount)
+        {
+            DestroyBallLines(ballLines);
+        }
+
+        //----Second Diagonal Check
+        ballLines.Clear();
+        ballLines.Enqueue(currentSelectedBall);
+        curMatPos = clickMatPos;
+
+        while (curMatPos.x >=0 && curMatPos.y < boardCol)
+        {
+            curMatPos.x--;
+            curMatPos.y++;
+            if (HasBallOn(curMatPos))
+            {
+                var ballEntry = ballDictionary[curMatPos];
+                if (ballEntry.BallColor == curBallColor)
+                {
+                    ballLines.Enqueue(ballEntry);
+                }
+                else break;
+            }
+            else break;
+        }
+
+        curMatPos = clickMatPos;
+        while (curMatPos.x < boardRow && curMatPos.y >= 0)
+        {
+            curMatPos.x++;
+            curMatPos.y--;
+            if (HasBallOn(curMatPos))
+            {
+                var ballEntry = ballDictionary[curMatPos];
+                if (ballEntry.BallColor == curBallColor)
+                {
+                    ballLines.Enqueue(ballEntry);
+                }
+                else break;
+            }
+            else break;
+        }
+
+        //Check if this lines longer than the player desire values
+        if (ballLines.Count >= destroyAmmount)
+        {
+            //Debug.Log("Destroy ball diagonal line!");
+            DestroyBallLines(ballLines);
+        }
+    }
+
+
+    private void DestroyBallLines(Queue<BallController> ballLines)
+    {
+        while (ballLines.Count > 0)
+        {
+            var ball = ballLines.Dequeue();
+            Destroy(ball.gameObject);
+        }
+    }
 
     private void GenerateBalls(int ballCount)
     {

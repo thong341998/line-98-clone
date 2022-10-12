@@ -18,6 +18,7 @@ public class BallController : MonoBehaviour
     [SerializeField] private float moveSpeed = 5f;
 
     
+
     private BallState ballState;
     public BallState BallState
     {
@@ -39,6 +40,8 @@ public class BallController : MonoBehaviour
         }
     }
 
+    public Color BallColor { get => ballSprite.color; }
+
     //Components
     private SpriteRenderer ballSprite;
     private Animator ballAnimator;
@@ -53,9 +56,6 @@ public class BallController : MonoBehaviour
 
 
     private readonly int IS_CLICK_PARAM = Animator.StringToHash("isClick");
-
-    
-    
 
     void Start()
     {
