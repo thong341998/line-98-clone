@@ -10,14 +10,10 @@ public enum BallState
     Moving
 }
 
-public class BallController : MonoBehaviour
+public class BallController : BallBase
 {
     public event System.Action OnBallMoveCompleted = delegate { };
-
-    [SerializeField] private float moveTime = 0.5f;
     [SerializeField] private float moveSpeed = 5f;
-
-    
 
     private BallState ballState;
     public BallState BallState
@@ -40,10 +36,9 @@ public class BallController : MonoBehaviour
         }
     }
 
-    public Color BallColor { get => ballSprite.color; }
+    
 
     //Components
-    private SpriteRenderer ballSprite;
     private Animator ballAnimator;
     private Coroutine moveByUnitCR;
 
@@ -57,10 +52,7 @@ public class BallController : MonoBehaviour
 
     private readonly int IS_CLICK_PARAM = Animator.StringToHash("isClick");
 
-    void Start()
-    {
-        InitValues();
-    }
+   
 
     public void SetPath(Queue<Vector2> boardPath)
     {
@@ -80,15 +72,16 @@ public class BallController : MonoBehaviour
         BallState = BallState.Idle;
     }
 
-    public void SetData(Color color)
+    public override void SetData(Color color)
     {
         ballSprite.color = color;
     }
 
-    public void InitValues()
+    public override void InitValues()
     {
+        base.InitValues();
+        
         ballState = BallState.Idle;
-        ballSprite = GetComponent<SpriteRenderer>();
         ballAnimator = GetComponent<Animator>();
     }
 
@@ -133,22 +126,4 @@ public class BallController : MonoBehaviour
     }
 
     
-   
-
-    IEnumerator CR_MoveByUnit(Vector2 src, Vector2 dest, System.Action completed = null)
-    {
-        float t = 0f;
-        float cur = 0f;
-        while (cur < moveTime)
-        {
-            cur += Time.deltaTime;
-            t = cur / moveTime;
-            Vector2 newPos = Vector2.Lerp(src, dest, t);
-            transform.position = newPos;
-            yield return null;
-        }
-
-        transform.position = dest;
-        completed?.Invoke();
-    }
 }

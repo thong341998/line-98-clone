@@ -36,7 +36,6 @@ struct PPair
 }
 
 
-
 public class BoardManager : MonoBehaviour, IPointerClickHandler
 {
     public static event Action<Queue<Vector2>> OnGeneratePathComplete = delegate { };
@@ -44,13 +43,16 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
     public static BoardManager Instance = null;
 
     [Header("References")]
-    [SerializeField] private BallDestroyer ballDestroyer;
+    [SerializeField] private GameObject ballPrefabs;
+    [SerializeField] private GameObject queueBallPrefabs;
+    [SerializeField] private BallQueueVisualizer ballQueueVisualizer;
 
     [Header("Configuration")]
     [Header("Ball Generation")]
-    [SerializeField] private GameObject ballPrefabs;
+    
     [SerializeField] private Color[] colorArray;
     [SerializeField] private int ballCount;
+    [SerializeField] private int queueBallCount;
 
     [Header("Bal Lines")]
     [SerializeField] private int destroyAmmount = 3;//Number of ball created a line and can be destroy
@@ -58,16 +60,22 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
     [Header("Debugging")]
     [SerializeField] private bool drawPath;
 
-    private BallController currentSelectedBall = null;
-    private Dictionary<Vector2Int, BallController> ballDictionary = new Dictionary<Vector2Int, BallController>(); // Use to store ball with its matrix position
-    private Stack<Vector2Int> ballPath = new Stack<Vector2Int>();
-
     #region Cache Value
+    //Data structures
+    private Queue<Vector2> boardPath = new Queue<Vector2>(); // The path generate from A* Pathfinding in board position
+    private Stack<Vector2Int> ballPath = new Stack<Vector2Int>();
+    private Dictionary<Vector2Int, BallController> ballDictionary = new Dictionary<Vector2Int, BallController>(); // Use to store ball with its matrix position
+    private List<Vector2Int> emptyMatrixPosition = new List<Vector2Int>();
+    private Dictionary<Vector2Int, BallQueueController> queueBallDictionary = new Dictionary<Vector2Int, BallQueueController>();
+
+    //Class instances
+    private BallController currentSelectedBall = null;
+
+    //Data types
     private int boardRow;
     private int boardCol;
     private Vector2 cellSize;
-    private Queue<Vector2> boardPath = new Queue<Vector2>(); // The path generate from A* Pathfinding in board position
-
+    
     #endregion  
 
     private void Awake()
@@ -77,14 +85,13 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         else if (Instance != null)
             DestroyImmediate(gameObject);
     }
-
     
-
     // Start is called before the first frame update
     void Start()
     {
         InitValues();
-        GenerateBalls(ballCount);
+        GenerateBalls();
+        GenerateQueueBall();
     }
 
     void OnDrawGizmos()
@@ -102,9 +109,22 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
 
     private void InitValues()
     {
+        //Cache value
         boardRow = MapConstants.BOARD_ROW;
         boardCol = MapConstants.BOARD_COL;
         cellSize = MapProvider.Instance.cellSize;
+
+        //Init all matrix bot position
+        Vector2Int cur = new Vector2Int();
+        for (int i = 0; i < boardRow; i++)
+        {
+            for (int j = 0; j < boardCol; j++)
+            {
+                cur.x = i;
+                cur.y = j;
+                emptyMatrixPosition.Add(cur);
+            }
+        }
     }
 
     Vector2Int prevBoard;
@@ -156,6 +176,15 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
             var destMatPos = UtilMapHelpers.BoardToMatrixPosition(boardPosition, cellSize, boardCol, boardRow);
             ballPath = AStarPathFinding(ballMatPos,destMatPos, boardRow, boardCol);
 
+            //If can find nay path, then reset every thing
+            if (ballPath == null)
+            {
+                currentSelectedBall.OnBallCancelSelected();
+                ResetValues();
+                return;
+            }
+
+
             while (ballPath.Count != 0)
             {
                 var waypoint = ballPath.Pop();
@@ -177,15 +206,22 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
 
     private void CurrentSelectedBall_OnBallMoveCompleted()
     {
-        //Update the position of the ball
+        //Update the position of the ball dictionary and empty cell matrix
         ballDictionary.Remove(prevBoard);
         ballDictionary.Add(UtilMapHelpers.BoardToMatrixPosition(currentSelectedBall.transform.position, cellSize, boardCol, boardRow),currentSelectedBall);
+        emptyMatrixPosition.Add(prevBoard);
+
 
         //Find ball lines
         DestroyBallLines();
 
         //End turn,  change to the next ball by reseting values
         currentSelectedBall.OnBallMoveCompleted -= CurrentSelectedBall_OnBallMoveCompleted;
+        ResetValues();
+    }
+
+    private void ResetValues()
+    {
         currentSelectedBall = null;
         prevBoard = new Vector2Int(-1, -1);
     }
@@ -383,26 +419,43 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         }
     }
 
-    private void GenerateBalls(int ballCount)
+    private void GenerateQueueBall()
     {
         Color randColor = new Color();
-        int count = 0;
-        Vector2Int matPos = new Vector2Int();
-        while (count <= ballCount)
+
+        for (int i = 0; i < queueBallCount; i++)
         {
-           
-            matPos.Set(Random.Range(0, boardRow), Random.Range(0, boardCol));
-            if (!ballDictionary.ContainsKey(matPos))
-            {
-                randColor = colorArray[Random.Range(0, colorArray.Length)];
-                var boardPos = UtilMapHelpers.MatrixToBoardPosition(matPos, cellSize, boardCol, boardRow);
-                var ballPref = Instantiate(ballPrefabs, boardPos, Quaternion.identity, transform).GetComponent<BallController>();
-                ballPref.InitValues();
-                ballPref.SetData(randColor);
-                ballDictionary.Add(matPos, ballPref);
-                count++;
-            }
+            randColor = colorArray[Random.Range(0, colorArray.Length)];
+            var randomMatPos = emptyMatrixPosition[Random.Range(0, emptyMatrixPosition.Count)];
+            var boardPos = UtilMapHelpers.MatrixToBoardPosition(randomMatPos, cellSize, boardCol, boardRow);
+            var ballPref = Instantiate(queueBallPrefabs, boardPos, Quaternion.identity, transform).GetComponent<BallQueueController>();
+            ballPref.InitValues();
+            ballPref.SetData(randColor);
+            queueBallDictionary.Add(randomMatPos, ballPref);
+            emptyMatrixPosition.Remove(randomMatPos);
         }
+
+        ballQueueVisualizer.Visualize(queueBallDictionary);
+    }
+
+
+
+    private void GenerateBalls()
+    {
+        Color randColor = new Color();
+
+        for (int i = 0; i < ballCount; i++)
+        {
+            randColor = colorArray[Random.Range(0, colorArray.Length)];
+            var randomMatPos = emptyMatrixPosition[Random.Range(0, emptyMatrixPosition.Count)];
+            var boardPos = UtilMapHelpers.MatrixToBoardPosition(randomMatPos, cellSize, boardCol, boardRow);
+            var ballPref = Instantiate(ballPrefabs, boardPos, Quaternion.identity, transform).GetComponent<BallController>();
+            ballPref.InitValues();
+            ballPref.SetData(randColor);
+            ballDictionary.Add(randomMatPos, ballPref);
+            emptyMatrixPosition.Remove(randomMatPos);
+        }
+
         
     }
 
@@ -415,7 +468,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
     /// <param name="boardCol"></param>
     /// <returns>A Stack of Vector2Int, which is coordinate in matrix created by boardRow and boardCol, 
     /// with the top is the destinationn</returns>
-    
+
     private Stack<Vector2Int> AStarPathFinding(Vector2Int source, Vector2Int dest, int boardRow, int boardCol)
     {
         
@@ -687,8 +740,6 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
     {
         return (curSuccessor.x >= 0) && (curSuccessor.x < MapConstants.BOARD_COL) && (curSuccessor.y >= 0) && (curSuccessor.y < MapConstants.BOARD_ROW);
     }
-
-    
 
     private bool HasBallOn(Vector2 boardPosition)
     {
