@@ -39,6 +39,7 @@ struct PPair
 public class BoardManager : MonoBehaviour, IPointerClickHandler
 {
     public static event Action<Queue<Vector2>> OnGeneratePathComplete = delegate { };
+    public static event Action<int> OnBallLineDestroy = delegate { };
 
     public static BoardManager Instance = null;
 
@@ -59,9 +60,11 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
 
     [Header("Debugging")]
     [SerializeField] private bool drawPath;
+    [SerializeField] private bool drawClick;
+    [SerializeField] private bool drawAllEmptyPos;
 
     #region Cache Value
-    //Data structures
+    //Data structures, collections
     private Queue<Vector2> boardPath = new Queue<Vector2>(); // The path generate from A* Pathfinding in board position
     private Stack<Vector2Int> ballPath = new Stack<Vector2Int>();
     private Dictionary<Vector2Int, BallController> ballDictionary = new Dictionary<Vector2Int, BallController>(); // Use to store ball with its matrix position
@@ -75,6 +78,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
     private int boardRow;
     private int boardCol;
     private Vector2 cellSize;
+    private Coroutine enlargeQueueBallCR;
     
     #endregion  
 
@@ -96,14 +100,31 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
 
     void OnDrawGizmos()
     {
-        Gizmos.color = Color.black;
+        
         if (drawPath)
         {
+            Gizmos.color = Color.black;
             foreach (var center in boardPath)
             {
                 Gizmos.DrawSphere(new Vector3(center.x, center.y), 0.1f);
             }
             //Gizmos.DrawSphere(prevBoard, 0.1f);
+        }
+
+        if (drawClick)
+        {
+            Gizmos.color = Color.grey;
+            Gizmos.DrawSphere(_boardPosition, 0.1f);
+        }
+
+        if (drawAllEmptyPos)
+        {
+            Gizmos.color = Color.cyan;
+            foreach (var empty in emptyMatrixPosition)
+            {
+                Gizmos.DrawCube(UtilMapHelpers.MatrixToBoardPosition(empty, cellSize, boardCol, boardRow), Vector3.one * 0.2f);
+            }
+            
         }
     }
 
@@ -129,19 +150,27 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
 
     Vector2Int prevBoard;
     Vector2Int clickMatPos;
+    Vector2 _boardPosition;
     public void OnPointerClick(PointerEventData eventData)
     {
+        if (GameManager.Instance.GameState != GameState.Playing)
+            return;
+
+
         //Debug.Log("On Click");
         Vector2 worldPos = MapProvider.Instance.gameCam.ScreenToWorldPoint(eventData.position);
 
         //Snap to board position
         Vector2 boardPosition = UtilMapHelpers.WorldToBoardPosition(worldPos, cellSize, boardCol, boardRow);
+        _boardPosition = boardPosition;
         clickMatPos = UtilMapHelpers.BoardToMatrixPosition(boardPosition, cellSize, boardCol, boardRow);
         bool hasBallOnPos = HasBallOn(boardPosition);
         //Debug.Log(hasBallOnPos);
         //Check if the board postion has the ball in it
         if (hasBallOnPos)
         {
+            //Debug.Log("has ball on: " + clickMatPos);
+
             //If click ball and click on another ball, then cancel previous ball, s
             BallController prevBall = currentSelectedBall;
 
@@ -151,9 +180,9 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 currentSelectedBall.transform.position, cellSize, boardCol, boardRow);
 
             //Click on the same position and has ball            
-            if (prevBoard == selectedBallMatPos)
+            if (prevBoard == clickMatPos)
             {
-                Debug.Log("Click on same ball!");
+                Debug.Log("Click on same bal with: " + prevBoard + " and " + selectedBallMatPos);
                 return;
             }
 
@@ -163,67 +192,159 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         }
 
         //Else if click on empty cell and the current selected ball is not empty, then generate path and move ball on that path
-        else if (currentSelectedBall != null) 
+        else
         {
-          
-
-            ballPath.Clear();
-            boardPath.Clear();
-
-           
-            var ballMatPos = UtilMapHelpers.BoardToMatrixPosition(currentSelectedBall.transform.position, cellSize, boardCol, boardRow);
-            //Debug.Log(ballMatPos);
-            var destMatPos = UtilMapHelpers.BoardToMatrixPosition(boardPosition, cellSize, boardCol, boardRow);
-            ballPath = AStarPathFinding(ballMatPos,destMatPos, boardRow, boardCol);
-
-            //If can find nay path, then reset every thing
-            if (ballPath == null)
+            //Debug.Log(clickMatPos +  " empty");
+            if (currentSelectedBall != null)
             {
-                currentSelectedBall.OnBallCancelSelected();
-                ResetValues();
-                return;
+
+
+                ballPath.Clear();
+                boardPath.Clear();
+
+
+                var ballMatPos = UtilMapHelpers.BoardToMatrixPosition(currentSelectedBall.transform.position, cellSize, boardCol, boardRow);
+                //Debug.Log(ballMatPos);
+                var destMatPos = UtilMapHelpers.BoardToMatrixPosition(boardPosition, cellSize, boardCol, boardRow);
+                ballPath = AStarPathFinding(ballMatPos, destMatPos, boardRow, boardCol);
+
+                //If can find any path, then reset every thing
+                if (ballPath == null)
+                {
+                    Debug.Log("Cant find ball path!");
+                    currentSelectedBall.OnBallCancelSelected();
+                    ResetValues();
+                    return;
+                }
+
+
+                while (ballPath.Count != 0)
+                {
+                    var waypoint = ballPath.Pop();
+                    var boardPos = UtilMapHelpers.MatrixToBoardPosition(waypoint, cellSize, boardCol, boardRow);
+                    boardPath.Enqueue(boardPos);
+                    //Debug.Log(boardPosition);
+                }
+
+
+                //Set path for current ball to move itself and subcribe to even when ball move completed
+                currentSelectedBall.SetPath(boardPath);
+                UpdateNormalBallPos(prevBoard);
+                currentSelectedBall.OnBallMoveCompleted += CurrentSelectedBall_OnBallMoveCompleted;
             }
 
-
-            while (ballPath.Count != 0)
-            {
-                var waypoint = ballPath.Pop();
-                var boardPos = UtilMapHelpers.MatrixToBoardPosition(waypoint, cellSize, boardCol, boardRow);
-                boardPath.Enqueue(boardPos);
-                //Debug.Log(boardPosition);
-            }
-
-
-            //Set path for current ball to move itself and subcribe to even when ball move completed
-            currentSelectedBall.SetPath(boardPath);
-            currentSelectedBall.OnBallMoveCompleted += CurrentSelectedBall_OnBallMoveCompleted;
         }
 
-        prevBoard = clickMatPos;
 
-        
+        prevBoard = clickMatPos;
+        //Debug.Log("save prev board: " + prevBoard);
+    }
+
+    void AddNewNormalBall(Vector2Int matPos,BallBase newBall) 
+    {
+        if (newBall.GetType() == typeof(BallController))
+        {
+            ballDictionary.Add(matPos,(BallController) newBall);
+        }
+        else if (newBall.GetType() == typeof(BallQueueController))
+        {
+            queueBallDictionary.Add(matPos, (BallQueueController)newBall);
+        }
+
+        emptyMatrixPosition.Remove(matPos);
+    }
+
+    void UpdateNormalBallPos(Vector2Int matPos)
+    {
+        ballDictionary.Remove(matPos);
+        emptyMatrixPosition.Add(matPos);
     }
 
     private void CurrentSelectedBall_OnBallMoveCompleted()
     {
         //Update the position of the ball dictionary and empty cell matrix
-        ballDictionary.Remove(prevBoard);
-        ballDictionary.Add(UtilMapHelpers.BoardToMatrixPosition(currentSelectedBall.transform.position, cellSize, boardCol, boardRow),currentSelectedBall);
-        emptyMatrixPosition.Add(prevBoard);
+        var currentMatPos = UtilMapHelpers.BoardToMatrixPosition(currentSelectedBall.transform.position, cellSize, boardCol, boardRow);
+        AddNewNormalBall(currentMatPos, currentSelectedBall);
+        
 
+        //Check if that pos has the queue ball, then replace the queue ball with current ball
+        if (queueBallDictionary.ContainsKey(clickMatPos))
+        {
+            var queueBall = queueBallDictionary[clickMatPos];
+            Destroy(queueBall.gameObject);
 
-        //Find ball lines
-        DestroyBallLines();
+            queueBallDictionary.Remove(clickMatPos);
 
-        //End turn,  change to the next ball by reseting values
-        currentSelectedBall.OnBallMoveCompleted -= CurrentSelectedBall_OnBallMoveCompleted;
-        ResetValues();
+        }
+
+        //Enlarge all queue balls, wait for completed all enlargion and create generate new queue ball
+        EnlargeQueueBalls(() =>
+        {
+
+            //Check if there is no cell to generate ball
+            if (emptyMatrixPosition.Count == 0)
+            {
+                //Then game lose
+                GameManager.Instance.LoseGame();
+                return;
+            }
+
+            ChangeQueueBallsToNormalBalls();
+            GenerateQueueBall();
+
+            //Find and destroy ball lines
+            DestroyBallLines();
+
+            //End turn,  change to the next ball by reseting values
+            currentSelectedBall.OnBallMoveCompleted -= CurrentSelectedBall_OnBallMoveCompleted;
+            ResetValues();
+            
+        });
+    }
+
+    private void ChangeQueueBallsToNormalBalls()
+    {
+        foreach (var queueBall in queueBallDictionary)
+        {
+            queueBall.Value.gameObject.AddComponent<BallController>();
+            
+            var ballPref = Instantiate(ballPrefabs, queueBall.Value.transform.position, Quaternion.identity, transform).GetComponent<BallController>();
+            ballPref.InitValues();
+            ballPref.SetData(queueBall.Value.BallColor);
+            ballDictionary.Add(queueBall.Key, ballPref);
+            Destroy(queueBall.Value.gameObject);
+        }
+
+        queueBallDictionary.Clear();
+    }
+
+    private void EnlargeQueueBalls(System.Action completed)
+    {
+
+        if (enlargeQueueBallCR != null)
+            StopCoroutine(enlargeQueueBallCR);
+
+        enlargeQueueBallCR = StartCoroutine(CR_EnlargeQueueBalls(completed));
+    }
+
+    private IEnumerator CR_EnlargeQueueBalls(System.Action completed)
+    {
+        float enlargeTime = 0f;
+        foreach (var queueBall in queueBallDictionary)
+        {
+            enlargeTime = queueBall.Value.EnlargeTime;
+            queueBall.Value.EnlargeToNormal();
+        }
+
+        yield return new WaitForSeconds(enlargeTime);
+        completed?.Invoke();
     }
 
     private void ResetValues()
     {
         currentSelectedBall = null;
         prevBoard = new Vector2Int(-1, -1);
+        //Debug.Log("reset prev board: " + prevBoard);
     }
 
     private void BallController_OnPlayerClick(BallController ballController)
@@ -412,18 +533,26 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
 
     private void DestroyBallLines(Queue<BallController> ballLines)
     {
+        int ballCount = ballLines.Count;
         while (ballLines.Count > 0)
         {
             var ball = ballLines.Dequeue();
             Destroy(ball.gameObject);
         }
+
+        //Fire ball line destroy event
+        OnBallLineDestroy?.Invoke(ballCount);
     }
 
     private void GenerateQueueBall()
     {
+
+        int exactQueueBallCount = queueBallCount <= emptyMatrixPosition.Count ? queueBallCount : (queueBallCount - emptyMatrixPosition.Count);
+        //If 
+
         Color randColor = new Color();
 
-        for (int i = 0; i < queueBallCount; i++)
+        for (int i = 0; i < exactQueueBallCount; i++)
         {
             randColor = colorArray[Random.Range(0, colorArray.Length)];
             var randomMatPos = emptyMatrixPosition[Random.Range(0, emptyMatrixPosition.Count)];
@@ -502,9 +631,11 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         Vector2Int currentSuccessor = Vector2Int.zero;
         Stack<Vector2Int> path = new Stack<Vector2Int>();
         
-        while (openList.Count >= 0)
+        while (openList.Count > 0)
         {
+           
             var pPair = openList[0];
+            
 
             openList.RemoveAt(0);
 
@@ -695,7 +826,12 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         }
 
         if (!foundDest)
+        {
             path = null;//Unable to found destination
+        }
+
+        //Debug.Log(foundDest ? "Found path!" : "Not found path");
+            
              
         return path;
     }

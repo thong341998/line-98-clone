@@ -24,6 +24,7 @@ public class GameManager : MonoBehaviour
     private GameState _gameState = GameState.Prepare;
     [SerializeField]
     private int targetFrameRate = 60;
+    public int scoreAmountPerBall = 10;
 
     public GameState GameState
     {
@@ -50,6 +51,8 @@ public class GameManager : MonoBehaviour
             Instance = this;
         else if (Instance != null)
             DestroyImmediate(gameObject);
+
+        DontDestroyOnLoad(gameObject);
     }
 
     // Start is called before the first frame update
@@ -57,7 +60,7 @@ public class GameManager : MonoBehaviour
     {
         Application.targetFrameRate = targetFrameRate;
         Input.simulateMouseWithTouches = true;
-        PrepareGame();
+        //PrepareGame();
     }
 
 
@@ -69,5 +72,10 @@ public class GameManager : MonoBehaviour
     public void StartGame()
     {
         _gameState = GameState.Start;
+    }
+
+    public void LoseGame()
+    {
+        _gameState = GameState.GameOver;
     }
 }

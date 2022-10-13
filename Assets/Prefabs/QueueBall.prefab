@@ -96,4 +96,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   initSizeScale: 0.2
-  enlareTime: 0.5
+  enlargeTime: 0.2

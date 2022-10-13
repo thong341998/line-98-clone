@@ -18,7 +18,8 @@ namespace CommonConstants
 
     public class StringConstants
     {
-        
+        public static readonly string PLAYER_SCORE_KEY = "PlayerScore";
+        public static readonly string HIGH_SCORE_KEY = "HighScore";
     }
 }
 
