@@ -45,6 +45,8 @@ public class GameSessionInfoManager : MonoBehaviour
     {
         playerScore = PlayerPrefs.GetInt(StringConstants.PLAYER_SCORE_KEY, 0);
         highScore = PlayerPrefs.GetInt(StringConstants.HIGH_SCORE_KEY, 0);
+
+        UIManager.Instance.UpdateHighScoreText(highScore);
     }
 
     private void BoardManager_OnBallLineDestroy(int ballAmount)
@@ -59,7 +61,7 @@ public class GameSessionInfoManager : MonoBehaviour
             highScore = playerScore;
 
             //Fire high score event
-
+            UIManager.Instance.UpdateHighScoreText(highScore);
         }
 
         //Save to database

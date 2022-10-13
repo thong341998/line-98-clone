@@ -277,6 +277,9 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
 
         }
 
+        //Find and destroy ball lines
+        DestroyBallLines();
+
         //Enlarge all queue balls, wait for completed all enlargion and create generate new queue ball
         EnlargeQueueBalls(() =>
         {
@@ -292,8 +295,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
             ChangeQueueBallsToNormalBalls();
             GenerateQueueBall();
 
-            //Find and destroy ball lines
-            DestroyBallLines();
+            
 
             //End turn,  change to the next ball by reseting values
             currentSelectedBall.OnBallMoveCompleted -= CurrentSelectedBall_OnBallMoveCompleted;
@@ -306,7 +308,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
     {
         foreach (var queueBall in queueBallDictionary)
         {
-            queueBall.Value.gameObject.AddComponent<BallController>();
+            
             
             var ballPref = Instantiate(ballPrefabs, queueBall.Value.transform.position, Quaternion.identity, transform).GetComponent<BallController>();
             ballPref.InitValues();
@@ -361,8 +363,8 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         //Start at the current ball position
         Color curBallColor = currentSelectedBall.BallColor;
         Vector2Int curMatPos = clickMatPos;
-        Queue<BallController> ballLines = new Queue<BallController>();
-        ballLines.Enqueue(currentSelectedBall);
+        Queue<Vector2Int> ballLines = new Queue<Vector2Int>();
+        ballLines.Enqueue(curMatPos);
         //----Vertical Check ------     
         while (curMatPos.x >= 0  )
         {
@@ -372,7 +374,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 var ballEntry = ballDictionary[curMatPos];
                 if (ballEntry.BallColor == curBallColor)
                 {
-                    ballLines.Enqueue(ballEntry);
+                    ballLines.Enqueue(curMatPos);
                 }
                 else break;
             }
@@ -387,7 +389,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 var ballEntry = ballDictionary[curMatPos];
                 if (ballEntry.BallColor == curBallColor)
                 {
-                    ballLines.Enqueue(ballEntry);
+                    ballLines.Enqueue(curMatPos);
                 }
                 else break;
             }
@@ -397,13 +399,13 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         //Check if this lines longer than the player desire values
         if (ballLines.Count >= destroyAmmount)
         {
-            DestroyBallLines(ballLines);
+            DestroyAllBallLines(ballLines);
         }
 
         //------Horizonal Check------
         ballLines.Clear();
-        ballLines.Enqueue(currentSelectedBall);
         curMatPos = clickMatPos;
+        ballLines.Enqueue(curMatPos);
         while (curMatPos.y >=0)
         {
             curMatPos.y--;
@@ -412,7 +414,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 var ballEntry = ballDictionary[curMatPos];
                 if (ballEntry.BallColor == curBallColor)
                 {
-                    ballLines.Enqueue(ballEntry);
+                    ballLines.Enqueue(curMatPos);
                 }
                 else break;
             }
@@ -427,7 +429,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 var ballEntry = ballDictionary[curMatPos];
                 if (ballEntry.BallColor == curBallColor)
                 {
-                    ballLines.Enqueue(ballEntry);
+                    ballLines.Enqueue(curMatPos);
                 }
                 else break;
             }
@@ -437,13 +439,13 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         //Check if this lines longer than the player desire values
         if (ballLines.Count >= destroyAmmount)
         {
-            DestroyBallLines(ballLines);
+            DestroyAllBallLines(ballLines);
         }
 
         //----First Diagonal Check----
         ballLines.Clear();
-        ballLines.Enqueue(currentSelectedBall);
         curMatPos = clickMatPos;
+        ballLines.Enqueue(curMatPos);
         while (curMatPos.x >= 0 && curMatPos.y >= 0)
         {
             curMatPos.x--;
@@ -453,7 +455,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 var ballEntry = ballDictionary[curMatPos];
                 if (ballEntry.BallColor == curBallColor)
                 {
-                    ballLines.Enqueue(ballEntry);
+                    ballLines.Enqueue(curMatPos);
                 }
                 else break;
             }
@@ -470,7 +472,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 var ballEntry = ballDictionary[curMatPos];
                 if (ballEntry.BallColor == curBallColor)
                 {
-                    ballLines.Enqueue(ballEntry);
+                    ballLines.Enqueue(curMatPos);
                 }
                 else break;
             }
@@ -481,13 +483,14 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         //Check if this lines longer than the player desire values
         if (ballLines.Count >= destroyAmmount)
         {
-            DestroyBallLines(ballLines);
+            DestroyAllBallLines(ballLines);
         }
 
         //----Second Diagonal Check
         ballLines.Clear();
-        ballLines.Enqueue(currentSelectedBall);
         curMatPos = clickMatPos;
+        ballLines.Enqueue(curMatPos);
+        
 
         while (curMatPos.x >=0 && curMatPos.y < boardCol)
         {
@@ -498,7 +501,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 var ballEntry = ballDictionary[curMatPos];
                 if (ballEntry.BallColor == curBallColor)
                 {
-                    ballLines.Enqueue(ballEntry);
+                    ballLines.Enqueue(curMatPos);
                 }
                 else break;
             }
@@ -515,7 +518,7 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
                 var ballEntry = ballDictionary[curMatPos];
                 if (ballEntry.BallColor == curBallColor)
                 {
-                    ballLines.Enqueue(ballEntry);
+                    ballLines.Enqueue(curMatPos);
                 }
                 else break;
             }
@@ -526,19 +529,23 @@ public class BoardManager : MonoBehaviour, IPointerClickHandler
         if (ballLines.Count >= destroyAmmount)
         {
             //Debug.Log("Destroy ball diagonal line!");
-            DestroyBallLines(ballLines);
+            DestroyAllBallLines(ballLines);
         }
     }
 
 
-    private void DestroyBallLines(Queue<BallController> ballLines)
+    private void DestroyAllBallLines(Queue<Vector2Int> ballLines)
     {
         int ballCount = ballLines.Count;
         while (ballLines.Count > 0)
         {
             var ball = ballLines.Dequeue();
-            Destroy(ball.gameObject);
+            var ballController = ballDictionary[ball];
+            UpdateNormalBallPos(ball);
+            Destroy(ballController.gameObject);
         }
+
+       
 
         //Fire ball line destroy event
         OnBallLineDestroy?.Invoke(ballCount);

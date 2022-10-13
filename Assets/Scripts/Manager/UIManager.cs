@@ -9,6 +9,8 @@ public class UIManager : MonoBehaviour
 
     [Header("Object references")]
     [SerializeField] private Text playerScoreText;
+    [SerializeField] private Text highScoreText;
+
 
     private void Awake()
     {
@@ -19,11 +21,18 @@ public class UIManager : MonoBehaviour
 
     }
 
+    private void Start()
+    {
+        
+    }
 
     public void UpdatePlayerScoreText(int score)
     {
         playerScoreText.text = score.ToString();
     }
 
-
+    public void UpdateHighScoreText(int score)
+    {
+        highScoreText.text = score.ToString();
+    }
 }

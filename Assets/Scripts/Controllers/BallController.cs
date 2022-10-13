@@ -12,7 +12,10 @@ public enum BallState
 
 public class BallController : BallBase
 {
+    public static event System.Action<BallController> OnBallDestroyed = delegate { };
     public event System.Action OnBallMoveCompleted = delegate { };
+   
+
     [SerializeField] private float moveSpeed = 5f;
 
     private BallState ballState;
@@ -125,5 +128,10 @@ public class BallController : BallBase
         }
     }
 
-    
+
+    private void OnDestroy()
+    {
+        OnBallDestroyed?.Invoke(this);
+    }
+
 }
