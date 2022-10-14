@@ -10,7 +10,7 @@ public class UIManager : MonoBehaviour
     [Header("Object references")]
     [SerializeField] private Text playerScoreText;
     [SerializeField] private Text highScoreText;
-
+    [SerializeField] private ResultUIController resultUIController;
 
     private void Awake()
     {
@@ -19,6 +19,20 @@ public class UIManager : MonoBehaviour
         else if (Instance != this)
             DestroyImmediate(gameObject);
 
+        GameManager.OnGameStateChanged += GameManager_OnGameStateChanged;
+
+    }
+
+    private void GameManager_OnGameStateChanged(GameState newState, GameState oldState)
+    {
+        if (newState == GameState.GameOver)
+        {
+            resultUIController.Hide();
+        }
+        else if (newState == GameState.Playing)
+        {
+            resultUIController.Show();
+        }
     }
 
     private void Start()

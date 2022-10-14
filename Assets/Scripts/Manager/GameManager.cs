@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using UnityEngine.SceneManagement;
 
 public enum GameState
 {
@@ -101,6 +101,12 @@ public class GameManager : MonoBehaviour
     public void LoseGame()
     {
         _gameState = GameState.GameOver;
+    }
+
+    public void RestartGame()
+    {
+        GameState = GameState.Playing;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     void CheckScreenRatio()

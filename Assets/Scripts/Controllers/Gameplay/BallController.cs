@@ -16,7 +16,7 @@ public class BallController : BallBase
     public event System.Action OnBallMoveCompleted = delegate { };
    
 
-    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] protected float moveSpeed = 5f;
 
     private BallState ballState;
     public BallState BallState
