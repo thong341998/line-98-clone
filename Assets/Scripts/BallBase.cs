@@ -7,6 +7,7 @@ public class BallBase : MonoBehaviour
    
     protected SpriteRenderer ballSprite;
     public Color BallColor { get => ballSprite.color; }
+    public Sprite BallSprite { get => ballSprite.sprite; }
 
     public virtual void InitValues()
     {

@@ -17,7 +17,9 @@ public class BallQueueVisualizer : MonoBehaviour
         int cur = 0;
        foreach (var item in ballQueue)
         {
-            ballSprites[cur++].color = item.Value.BallColor;
+            
+            ballSprites[cur].color = item.Value.BallColor;
+            ballSprites[cur].sprite = item.Value.BallSprite;
         }
     }
 }
